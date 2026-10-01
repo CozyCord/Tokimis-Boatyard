@@ -1,0 +1,44 @@
+# gradle
+.gradle/
+build/
+out/
+classes/
+bin/
+
+# eclipse
+*.launch
+.settings/
+.classpath
+.project
+
+# idea
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# vscode
+.vscode/
+*.code-workspace
+
+# macos / windows
+*.DS_Store
+Thumbs.db
+desktop.ini
+
+# fabric runtime
+run/
+
+# java crash / profiling
+hs_err_*.log
+replay_*.log
+*.hprof
+*.jfr
+
+# jars (keep the gradle wrapper jar only)
+*.jar
+!gradle/wrapper/gradle-wrapper.jar
+
+# local properties
+local.properties
+secrets.gradle

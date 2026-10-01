@@ -1,0 +1,13 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "net.cozystudios.tokimiboatyard.mixin",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "BoatEntitySpeedMixin"
+  ],
+  "client": [],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
