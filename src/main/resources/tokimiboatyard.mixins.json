@@ -6,7 +6,9 @@
   "mixins": [
     "BoatEntitySpeedMixin"
   ],
-  "client": [],
+  "client": [
+    "client.ResourcePackManagerMixin"
+  ],
   "injectors": {
     "defaultRequire": 1
   }

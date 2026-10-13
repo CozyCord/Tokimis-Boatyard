@@ -1,6 +1,8 @@
 package net.cozystudios.tokimiboatyard.entity.client;
 
 import com.google.common.collect.ImmutableMap;
+import net.cozystudios.tokimiboatyard.data.BoatWood;
+import net.cozystudios.tokimiboatyard.data.BoatWoodRegistry;
 import net.cozystudios.tokimiboatyard.entity.BoatTier;
 import net.cozystudios.tokimiboatyard.entity.UpgradedBoatEntity;
 import net.cozystudios.tokimiboatyard.entity.UpgradedBoatPart;
@@ -11,7 +13,6 @@ import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.entity.EntityRenderer;
 import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.vehicle.BoatEntity;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
@@ -20,7 +21,9 @@ import org.joml.Quaternionf;
 import java.util.Map;
 
 public class UpgradedBoatRenderer extends EntityRenderer<UpgradedBoatEntity> {
-    private final Map<BoatEntity.Type, Identifier> textures;
+    private static final Identifier FALLBACK_TEXTURE =
+        new Identifier("minecraft", "textures/entity/chest_boat/oak.png");
+
     private final Map<BoatTier, Identifier> tierBlockTextures;
     private final UpgradedBoatModel boatModel;
     private final UpgradedBoatBandModel boatBandModel;
@@ -34,11 +37,6 @@ public class UpgradedBoatRenderer extends EntityRenderer<UpgradedBoatEntity> {
         this.boatBandModel = new UpgradedBoatBandModel(ctx.getPart(ModModelLayers.UPGRADED_BOAT_BAND));
         this.raftModel = new UpgradedRaftModel(ctx.getPart(ModModelLayers.UPGRADED_RAFT_CHUNK));
         this.raftBandModel = new UpgradedRaftBandModel(ctx.getPart(ModModelLayers.UPGRADED_RAFT_BAND));
-        ImmutableMap.Builder<BoatEntity.Type, Identifier> builder = ImmutableMap.builder();
-        for (BoatEntity.Type type : BoatEntity.Type.values()) {
-            builder.put(type, new Identifier("textures/entity/chest_boat/" + type.getName() + ".png"));
-        }
-        this.textures = builder.build();
         ImmutableMap.Builder<BoatTier, Identifier> tierBuilder = ImmutableMap.builder();
         for (BoatTier tier : BoatTier.values()) {
             tierBuilder.put(tier, new Identifier(tier.blockTexturePath()));
@@ -48,11 +46,13 @@ public class UpgradedBoatRenderer extends EntityRenderer<UpgradedBoatEntity> {
 
     @Override
     public Identifier getTexture(UpgradedBoatEntity entity) {
-        return textures.get(entity.getVariant());
+        BoatWood wood = BoatWoodRegistry.get(entity.getWoodId());
+        return wood != null ? wood.entityTexture() : FALLBACK_TEXTURE;
     }
 
     private static boolean isRaft(UpgradedBoatEntity entity) {
-        return entity.getVariant() == BoatEntity.Type.BAMBOO;
+        BoatWood wood = BoatWoodRegistry.get(entity.getWoodId());
+        return wood != null && wood.isRaft();
     }
 
     @Override

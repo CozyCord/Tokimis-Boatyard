@@ -1,6 +1,8 @@
 package net.cozystudios.tokimiboatyard.entity.client;
 
 import com.google.common.collect.ImmutableMap;
+import net.cozystudios.tokimiboatyard.data.BoatWood;
+import net.cozystudios.tokimiboatyard.data.BoatWoodRegistry;
 import net.cozystudios.tokimiboatyard.entity.BoatTier;
 import net.cozystudios.tokimiboatyard.entity.UpgradedBoatEntity;
 import net.cozystudios.tokimiboatyard.entity.UpgradedBoatPart;
@@ -11,7 +13,6 @@ import net.minecraft.client.render.VertexConsumerProvider;
 import net.minecraft.client.render.entity.EntityRenderer;
 import net.minecraft.client.render.entity.EntityRendererFactory;
 import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.entity.vehicle.BoatEntity;
 import net.minecraft.util.Identifier;
 import net.minecraft.util.math.MathHelper;
 import net.minecraft.util.math.RotationAxis;
@@ -21,9 +22,8 @@ import java.util.Map;
 
 public class UpgradedBoatPartRenderer extends EntityRenderer<UpgradedBoatPart> {
     private static final Identifier FALLBACK_TEXTURE =
-        new Identifier("textures/entity/chest_boat/oak.png");
+        new Identifier("minecraft", "textures/entity/chest_boat/oak.png");
 
-    private final Map<BoatEntity.Type, Identifier> textures;
     private final Map<BoatTier, Identifier> tierBlockTextures;
     private final UpgradedBoatModel boatModel;
     private final UpgradedBoatBandModel boatBandModel;
@@ -37,11 +37,6 @@ public class UpgradedBoatPartRenderer extends EntityRenderer<UpgradedBoatPart> {
         this.boatBandModel = new UpgradedBoatBandModel(ctx.getPart(ModModelLayers.UPGRADED_BOAT_BAND));
         this.raftModel = new UpgradedRaftModel(ctx.getPart(ModModelLayers.UPGRADED_RAFT_CHUNK));
         this.raftBandModel = new UpgradedRaftBandModel(ctx.getPart(ModModelLayers.UPGRADED_RAFT_BAND));
-        ImmutableMap.Builder<BoatEntity.Type, Identifier> builder = ImmutableMap.builder();
-        for (BoatEntity.Type type : BoatEntity.Type.values()) {
-            builder.put(type, new Identifier("textures/entity/chest_boat/" + type.getName() + ".png"));
-        }
-        this.textures = builder.build();
         ImmutableMap.Builder<BoatTier, Identifier> tierBuilder = ImmutableMap.builder();
         for (BoatTier tier : BoatTier.values()) {
             tierBuilder.put(tier, new Identifier(tier.blockTexturePath()));
@@ -53,11 +48,13 @@ public class UpgradedBoatPartRenderer extends EntityRenderer<UpgradedBoatPart> {
     public Identifier getTexture(UpgradedBoatPart part) {
         UpgradedBoatEntity parent = part.getParentBoat();
         if (parent == null) return FALLBACK_TEXTURE;
-        return textures.get(parent.getVariant());
+        BoatWood wood = BoatWoodRegistry.get(parent.getWoodId());
+        return wood != null ? wood.entityTexture() : FALLBACK_TEXTURE;
     }
 
     private static boolean isRaft(UpgradedBoatEntity boat) {
-        return boat.getVariant() == BoatEntity.Type.BAMBOO;
+        BoatWood wood = BoatWoodRegistry.get(boat.getWoodId());
+        return wood != null && wood.isRaft();
     }
 
     @Override
@@ -83,6 +80,13 @@ public class UpgradedBoatPartRenderer extends EntityRenderer<UpgradedBoatPart> {
         float interpYaw = prevYaw + yawDiff * tickDelta;
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180.0F - interpYaw));
 
+        int index = part.getIndex();
+        int totalParts = boat.getExtraParts();
+        boolean isLast = index >= totalParts;
+
+        float pivotShift = -index * net.cozystudios.tokimiboatyard.entity.UpgradedBoatEntity.SEGMENT_SPACING;
+        matrices.translate(0.0, 0.0, pivotShift);
+
         float damageWobble = boat.getDamageWobbleTicks() - tickDelta;
         float damageWobbleStrength = boat.getDamageWobbleStrength() - tickDelta;
         if (damageWobbleStrength < 0.0F) damageWobbleStrength = 0.0F;
@@ -98,12 +102,10 @@ public class UpgradedBoatPartRenderer extends EntityRenderer<UpgradedBoatPart> {
                 bubbleWobble * ((float) Math.PI / 180F), 1.0F, 0.0F, 1.0F));
         }
 
+        matrices.translate(0.0, 0.0, -pivotShift);
+
         matrices.scale(-1.0F, -1.0F, 1.0F);
         matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(90.0F));
-
-        int index = part.getIndex();
-        int totalParts = boat.getExtraParts();
-        boolean isLast = index >= totalParts;
 
         boolean segmentOccupied = boat.hasPassengerInSegment(index);
 

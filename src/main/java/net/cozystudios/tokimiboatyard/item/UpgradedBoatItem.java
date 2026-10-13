@@ -1,11 +1,12 @@
 package net.cozystudios.tokimiboatyard.item;
 
+import net.cozystudios.tokimiboatyard.data.BoatWood;
+import net.cozystudios.tokimiboatyard.data.BoatWoodRegistry;
 import net.cozystudios.tokimiboatyard.entity.BoatTier;
 import net.cozystudios.tokimiboatyard.entity.UpgradedBoatEntity;
 import net.minecraft.client.item.TooltipContext;
 import net.minecraft.entity.Entity;
 import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.vehicle.BoatEntity;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.predicate.entity.EntityPredicates;
@@ -13,6 +14,7 @@ import net.minecraft.stat.Stats;
 import net.minecraft.text.Text;
 import net.minecraft.text.TextColor;
 import net.minecraft.util.Hand;
+import net.minecraft.util.Identifier;
 import net.minecraft.util.TypedActionResult;
 import net.minecraft.util.hit.BlockHitResult;
 import net.minecraft.util.hit.HitResult;
@@ -30,16 +32,18 @@ public class UpgradedBoatItem extends Item {
     private static final Predicate<Entity> RIDERS = EntityPredicates.EXCEPT_SPECTATOR.and(Entity::canHit);
 
     private final BoatTier tier;
-    private final BoatEntity.Type woodType;
+    private final Identifier woodId;
 
-    public UpgradedBoatItem(BoatTier tier, BoatEntity.Type woodType, Item.Settings settings) {
+    public UpgradedBoatItem(BoatTier tier, Identifier woodId, Item.Settings settings) {
         super(settings);
         this.tier = tier;
-        this.woodType = woodType;
+        this.woodId = woodId;
     }
 
     public BoatTier getTier() { return tier; }
-    public BoatEntity.Type getWoodType() { return woodType; }
+    public Identifier getWoodId() { return woodId; }
+
+    public @Nullable BoatWood getWood() { return BoatWoodRegistry.get(woodId); }
 
     public static int readExtraSeats(ItemStack stack) {
         if (!stack.hasNbt()) return 0;
@@ -84,7 +88,7 @@ public class UpgradedBoatItem extends Item {
         }
         BlockHitResult blockHit = (BlockHitResult) hit;
         UpgradedBoatEntity boat = new UpgradedBoatEntity(world, hit.getPos().x, hit.getPos().y, hit.getPos().z);
-        boat.setVariant(this.woodType);
+        boat.setWoodId(this.woodId);
         boat.setTier(this.tier);
         boat.setExtraSeats(readExtraSeats(stack));
         boat.setYaw(user.getYaw());

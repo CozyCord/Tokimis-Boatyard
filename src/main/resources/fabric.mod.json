@@ -16,7 +16,13 @@
     ],
     "client": [
       "net.cozystudios.tokimiboatyard.TokimiBoatyardClient"
+    ],
+    "jei_mod_plugin": [
+      "net.cozystudios.tokimiboatyard.compat.jei.TokimiJeiPlugin"
     ]
+  },
+  "recommends": {
+    "jei": "*"
   },
   "mixins": [
     "tokimiboatyard.mixins.json"

@@ -62,6 +62,11 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
     private static final TrackedData<NbtCompound> SEATS =
         DataTracker.registerData(UpgradedBoatEntity.class, TrackedDataHandlerRegistry.NBT_COMPOUND);
 
+    private static final TrackedData<String> WOOD_ID =
+        DataTracker.registerData(UpgradedBoatEntity.class, TrackedDataHandlerRegistry.STRING);
+
+    public static final Identifier DEFAULT_WOOD_ID = new Identifier("minecraft", "oak");
+
     public static final float SEGMENT_SPACING = 1.75F;
 
     public static final int MAX_EXTRA_SEATS = 6;
@@ -76,6 +81,12 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
 
     private float lastSafeYaw;
     private boolean lastSafeInitialized = false;
+
+    private boolean destroying = false;
+    private boolean partsBeingDiscarded = false;
+
+    public boolean isDestroying() { return destroying; }
+    public boolean arePartsBeingDiscarded() { return partsBeingDiscarded; }
 
     public UpgradedBoatEntity(EntityType<? extends BoatEntity> type, World world) {
         super(type, world);
@@ -95,8 +106,38 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
         this.dataTracker.startTracking(TIER, BoatTier.COPPER.ordinal());
         this.dataTracker.startTracking(EXTRA_SEATS, 0);
         this.dataTracker.startTracking(SEATS, new NbtCompound());
+        this.dataTracker.startTracking(WOOD_ID, DEFAULT_WOOD_ID.toString());
     }
 
+    public Identifier getWoodId() {
+        String s = this.dataTracker.get(WOOD_ID);
+        return s == null || s.isEmpty() ? DEFAULT_WOOD_ID : Identifier.tryParse(s);
+    }
+
+    public void setWoodId(Identifier id) {
+        if (id == null) id = DEFAULT_WOOD_ID;
+        this.dataTracker.set(WOOD_ID, id.toString());
+        net.cozystudios.tokimiboatyard.data.BoatWood wood =
+            net.cozystudios.tokimiboatyard.data.BoatWoodRegistry.get(id);
+        if (wood != null && wood.vanillaType() != null) {
+            this.setVariant(wood.vanillaType());
+        } else {
+            this.setVariant(BoatEntity.Type.OAK);
+        }
+    }
+
+
+    @Override
+    @Nullable
+    public LivingEntity getControllingPassenger() {
+        LivingEntity firstLiving = null;
+        for (Entity passenger : this.getPassengerList()) {
+            if (passenger instanceof UpgradedBoatPart) continue;
+            if (passenger instanceof PlayerEntity player) return player;
+            if (passenger instanceof LivingEntity living && firstLiving == null) firstLiving = living;
+        }
+        return firstLiving;
+    }
 
     public BoatTier getTier() {
         return BoatTier.fromId(this.dataTracker.get(TIER));
@@ -165,12 +206,35 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
         }
     }
 
-    private void respawnParts() {
-        for (Entity e : new ArrayList<>(this.getPassengerList())) {
-            if (e instanceof UpgradedBoatPart) {
-                e.stopRiding();
-                e.discard();
+    private void trimExcessParts(int keep) {
+        this.partsBeingDiscarded = true;
+        try {
+            int kept = 0;
+            for (Entity e : new ArrayList<>(this.getPassengerList())) {
+                if (!(e instanceof UpgradedBoatPart)) continue;
+                if (kept < keep) {
+                    kept++;
+                } else {
+                    e.stopRiding();
+                    e.discard();
+                }
             }
+        } finally {
+            this.partsBeingDiscarded = false;
+        }
+    }
+
+    private void respawnParts() {
+        this.partsBeingDiscarded = true;
+        try {
+            for (Entity e : new ArrayList<>(this.getPassengerList())) {
+                if (e instanceof UpgradedBoatPart) {
+                    e.stopRiding();
+                    e.discard();
+                }
+            }
+        } finally {
+            this.partsBeingDiscarded = false;
         }
         createBoatParts();
     }
@@ -284,6 +348,10 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
 
     @Override
     protected void addPassenger(Entity passenger) {
+        if (passenger instanceof UpgradedBoatPart part && isExcessPart()) {
+            dismissExcessPart(part);
+            return;
+        }
         super.addPassenger(passenger);
         if (passenger instanceof UpgradedBoatPart) return;
         if (this.getWorld().isClient) return;
@@ -293,6 +361,25 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
         if (this.pendingSeat >= 0 && isSeatFree(this.pendingSeat)) seat = this.pendingSeat;
         if (seat < 0) seat = firstFreeSeat();
         if (seat >= 0) putSeat(id, seat);
+    }
+
+    private boolean isExcessPart() {
+        int count = 0;
+        for (Entity p : this.getPassengerList()) {
+            if (p instanceof UpgradedBoatPart) count++;
+        }
+        return count >= getExtraParts();
+    }
+
+    private void dismissExcessPart(UpgradedBoatPart part) {
+        if (this.getWorld().isClient) return;
+        this.partsBeingDiscarded = true;
+        try {
+            part.stopRiding();
+            part.discard();
+        } finally {
+            this.partsBeingDiscarded = false;
+        }
     }
 
     @Override
@@ -380,14 +467,17 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
 
         if (!this.getWorld().isClient && this.isAlive() && this.age > 20 && this.age % 20 == 0) {
             int expected = getExtraParts();
-            if (currentPartCount() < expected) {
+            long actual = currentPartCount();
+            if (actual < expected) {
                 respawnParts();
+            } else if (actual > expected) {
+                trimExcessParts(expected);
             }
             pruneStaleSeats();
         }
 
         if (!this.getWorld().isClient) {
-            autoMountAtSegment(0, this.getBoundingBox());
+            autoMountNearby();
         }
 
         if (!this.getWorld().isClient && getExtraParts() > 0 && this.isAlive()) {
@@ -417,8 +507,8 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
         }
     }
 
-    public void autoMountAtSegment(int segmentIndex, Box searchBox) {
-        Box expanded = searchBox.expand(0.2, -0.01, 0.2);
+    public void autoMountNearby() {
+        Box expanded = this.getBoundingBox().expand(0.75, 0.0, 0.75);
         List<Entity> nearby = this.getWorld().getOtherEntities(this, expanded,
             e -> !e.isSpectator() && e.canHit());
         for (Entity e : nearby) {
@@ -431,13 +521,35 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
             if (e.getWidth() >= this.getWidth()) continue;
             if (!canAddPassenger(e)) continue;
 
-            int seat = firstFreeSeatInSegment(segmentIndex);
+            int segment = closestSegment(e);
+            int seat = firstFreeSeatInSegment(segment);
             if (seat < 0) seat = firstFreeSeat();
             if (seat < 0) continue;
             setPendingSeat(seat);
             e.startRiding(this);
             setPendingSeat(-1);
         }
+    }
+
+    private int closestSegment(Entity e) {
+        float yawRad = this.getYaw() * ((float) Math.PI / 180F);
+        double sin = Math.sin(yawRad);
+        double cos = Math.cos(yawRad);
+        int bestSegment = 0;
+        double bestDistSq = Double.MAX_VALUE;
+        int totalSegments = getExtraParts() + 1;
+        for (int i = 0; i < totalSegments; i++) {
+            double segX = this.getX() + i * SEGMENT_SPACING * sin;
+            double segZ = this.getZ() - i * SEGMENT_SPACING * cos;
+            double dx = e.getX() - segX;
+            double dz = e.getZ() - segZ;
+            double distSq = dx * dx + dz * dz;
+            if (distSq < bestDistSq) {
+                bestDistSq = distSq;
+                bestSegment = i;
+            }
+        }
+        return bestSegment;
     }
 
     private void applyLavaBuoyancy() {
@@ -628,6 +740,7 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
 
     @Override
     public void remove(RemovalReason reason) {
+        this.destroying = true;
         if (!this.getWorld().isClient && reason.shouldDestroy()) {
             ItemScatterer.spawn(this.getWorld(), this, this);
         }
@@ -723,7 +836,7 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
     }
 
     @Override
-    public Item asItem() { return ModItems.get(getTier(), this.getVariant()); }
+    public Item asItem() { return ModItems.get(getTier(), getWoodId()); }
 
 
     @Override
@@ -732,6 +845,7 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
         nbt.putInt("Tier", getTier().ordinal());
         nbt.putInt("ExtraSeats", getExtraSeats());
         nbt.put("Seats", seatsNbt().copy());
+        nbt.putString("WoodId", getWoodId().toString());
         this.writeInventoryToNbt(nbt);
     }
 
@@ -749,6 +863,10 @@ public class UpgradedBoatEntity extends BoatEntity implements RideableInventory,
         }
         if (nbt.contains("Seats", NbtElement.COMPOUND_TYPE)) {
             this.dataTracker.set(SEATS, nbt.getCompound("Seats").copy());
+        }
+        if (nbt.contains("WoodId", NbtElement.STRING_TYPE)) {
+            Identifier id = Identifier.tryParse(nbt.getString("WoodId"));
+            if (id != null) setWoodId(id);
         }
         this.readInventoryFromNbt(nbt);
     }

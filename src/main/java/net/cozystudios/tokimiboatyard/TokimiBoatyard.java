@@ -1,5 +1,6 @@
 package net.cozystudios.tokimiboatyard;
 
+import net.cozystudios.tokimiboatyard.compat.ModdedBoatCompat;
 import net.cozystudios.tokimiboatyard.registry.ModEntities;
 import net.cozystudios.tokimiboatyard.registry.ModItems;
 import net.cozystudios.tokimiboatyard.registry.ModRecipes;
@@ -15,6 +16,7 @@ public class TokimiBoatyard implements ModInitializer {
     @Override
     public void onInitialize() {
         ModEntities.register();
+        ModdedBoatCompat.registerAll();
         ModItems.register();
         ModScreens.register();
         ModRecipes.register();

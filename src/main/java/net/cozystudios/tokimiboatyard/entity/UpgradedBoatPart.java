@@ -9,6 +9,7 @@ import net.minecraft.entity.data.TrackedData;
 import net.minecraft.entity.data.TrackedDataHandlerRegistry;
 import net.minecraft.entity.mob.WaterCreatureEntity;
 import net.minecraft.entity.passive.PassiveEntity;
+import net.minecraft.entity.MovementType;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.nbt.NbtCompound;
 import net.minecraft.network.listener.ClientPlayPacketListener;
@@ -16,12 +17,9 @@ import net.minecraft.network.packet.Packet;
 import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.Hand;
-import net.minecraft.util.math.Box;
 import net.minecraft.util.math.Vec3d;
 import net.minecraft.world.World;
 import org.jetbrains.annotations.Nullable;
-
-import java.util.List;
 
 public class UpgradedBoatPart extends Entity {
     private static final TrackedData<Integer> INDEX =
@@ -58,31 +56,35 @@ public class UpgradedBoatPart extends Entity {
         if (lifelessCountdown > 0) lifelessCountdown--;
         if (lifelessCountdown <= 0 && getParentBoat() == null) {
             this.discard();
+        }
+    }
+
+    @Override
+    public void move(MovementType type, Vec3d movement) {
+        if (this.hasVehicle()) return;
+        super.move(type, movement);
+    }
+
+    @Override
+    public void onBubbleColumnCollision(boolean drag) {}
+
+    @Override
+    public void onBubbleColumnSurfaceCollision(boolean drag) {}
+
+    @Override
+    public void stopRiding() {
+        if (this.getWorld() != null && this.getWorld().isClient) {
+            super.stopRiding();
             return;
         }
-
-        UpgradedBoatEntity parent = getParentBoat();
-        if (parent == null || getWorld().isClient) return;
-        Box searchBox = getBoundingBox().expand(0.2, -0.01, 0.2);
-        List<Entity> nearby = getWorld().getOtherEntities(this, searchBox,
-            e -> !e.isSpectator() && e.canHit());
-        for (Entity e : nearby) {
-            if (e.hasVehicle()) continue;
-            if (e instanceof UpgradedBoatPart) continue;
-            if (e instanceof PlayerEntity) continue;
-            if (!(e instanceof LivingEntity)) continue;
-            if (!(e instanceof PassiveEntity)) continue;
-            if (e instanceof WaterCreatureEntity) continue;
-            if (e.getWidth() >= this.getWidth()) continue;
-            if (!parent.canAddPassenger(e)) continue;
-
-            int seat = parent.firstFreeSeatInSegment(getIndex());
-            if (seat < 0) seat = parent.firstFreeSeat();
-            if (seat < 0) continue;
-            parent.setPendingSeat(seat);
-            e.startRiding(parent);
-            parent.setPendingSeat(-1);
+        Entity previous = this.getVehicle();
+        if (previous instanceof UpgradedBoatEntity parent
+            && parent.isAlive()
+            && !parent.isDestroying()
+            && !parent.arePartsBeingDiscarded()) {
+            return;
         }
+        super.stopRiding();
     }
 
 
