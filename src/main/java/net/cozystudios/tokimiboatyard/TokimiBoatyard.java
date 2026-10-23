@@ -5,16 +5,14 @@ import net.cozystudios.tokimiboatyard.registry.ModEntities;
 import net.cozystudios.tokimiboatyard.registry.ModItems;
 import net.cozystudios.tokimiboatyard.registry.ModRecipes;
 import net.cozystudios.tokimiboatyard.registry.ModScreens;
-import net.fabricmc.api.ModInitializer;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-public class TokimiBoatyard implements ModInitializer {
+public final class TokimiBoatyard {
     public static final String MOD_ID = "tokimiboatyard";
     public static final Logger LOGGER = LoggerFactory.getLogger(MOD_ID);
 
-    @Override
-    public void onInitialize() {
+    public static void initialize() {
         ModEntities.register();
         ModdedBoatCompat.registerAll();
         ModItems.register();
@@ -22,4 +20,6 @@ public class TokimiBoatyard implements ModInitializer {
         ModRecipes.register();
         LOGGER.info("Tokimi's Boatyard initialized");
     }
+
+    private TokimiBoatyard() {}
 }

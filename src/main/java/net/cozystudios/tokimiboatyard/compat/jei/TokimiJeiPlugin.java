@@ -10,17 +10,22 @@ import net.cozystudios.tokimiboatyard.data.BoatWoodRegistry;
 import net.cozystudios.tokimiboatyard.entity.BoatTier;
 import net.cozystudios.tokimiboatyard.item.UpgradedBoatItem;
 import net.cozystudios.tokimiboatyard.registry.ModItems;
-import net.minecraft.item.Item;
-import net.minecraft.item.ItemStack;
-import net.minecraft.item.Items;
-import net.minecraft.recipe.CraftingRecipe;
-import net.minecraft.recipe.Ingredient;
-import net.minecraft.recipe.ShapedRecipe;
-import net.minecraft.recipe.ShapelessRecipe;
-import net.minecraft.recipe.book.CraftingRecipeCategory;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.collection.DefaultedList;
-
+import net.cozystudios.tokimiboatyard.util.ModIds;
+import net.minecraft.core.NonNullList;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.item.crafting.CraftingBookCategory;
+import net.minecraft.world.item.crafting.CraftingRecipe;
+import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.ShapedRecipe;
+import net.minecraft.world.item.crafting.ShapelessRecipe;
+//? if >=1.21.1 {
+/*import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.ShapedRecipePattern;
+import java.util.Optional;
+*///? }
 import java.util.ArrayList;
 import java.util.List;
 
@@ -28,8 +33,8 @@ import java.util.List;
 public class TokimiJeiPlugin implements IModPlugin {
 
     @Override
-    public Identifier getPluginUid() {
-        return new Identifier(TokimiBoatyard.MOD_ID, "jei_plugin");
+    public ResourceLocation getPluginUid() {
+        return ModIds.of(TokimiBoatyard.MOD_ID, "jei_plugin");
     }
 
     @Override
@@ -37,7 +42,11 @@ public class TokimiJeiPlugin implements IModPlugin {
         TokimiBoatyard.LOGGER.info("[JEI] TokimiJeiPlugin.registerRecipes called; wood registry size={}",
             BoatWoodRegistry.all().size());
 
+//? if >=1.21.1 {
+        /*List<RecipeHolder<CraftingRecipe>> crafting = new ArrayList<>();
+*///? } else {
         List<CraftingRecipe> crafting = new ArrayList<>();
+//? }
         int upgradeCount = 0, expansionCount = 0, downgradeCount = 0;
 
         for (BoatTier tier : BoatTier.values()) {
@@ -53,7 +62,13 @@ public class TokimiJeiPlugin implements IModPlugin {
                     input = ModItems.get(tier.previous(), wood.id());
                 }
                 if (input == null) continue;
+//? if >=1.21.1 {
+                /*crafting.add(new RecipeHolder<>(ModIds.of(TokimiBoatyard.MOD_ID,
+                    "jei_up_" + tier.id() + "_" + wood.tokimiPath()),
+                    buildUpgradeRecipe(tier, wood, input, ingot, output)));
+*///? } else {
                 crafting.add(buildUpgradeRecipe(tier, wood, input, ingot, output));
+//? }
                 upgradeCount++;
             }
         }
@@ -62,9 +77,21 @@ public class TokimiJeiPlugin implements IModPlugin {
             for (BoatWood wood : BoatWoodRegistry.all()) {
                 UpgradedBoatItem item = ModItems.get(tier, wood.id());
                 if (item == null) continue;
+//? if >=1.21.1 {
+                /*crafting.add(new RecipeHolder<>(ModIds.of(TokimiBoatyard.MOD_ID,
+                    "jei_seat_" + tier.id() + "_" + wood.tokimiPath()),
+                    buildExpansionRecipe(tier, wood, item)));
+*///? } else {
                 crafting.add(buildExpansionRecipe(tier, wood, item));
+//? }
                 expansionCount++;
+//? if >=1.21.1 {
+                /*crafting.add(new RecipeHolder<>(ModIds.of(TokimiBoatyard.MOD_ID,
+                    "jei_down_" + tier.id() + "_" + wood.tokimiPath()),
+                    buildDowngradeRecipe(tier, wood, item)));
+*///? } else {
                 crafting.add(buildDowngradeRecipe(tier, wood, item));
+//? }
                 downgradeCount++;
             }
         }
@@ -75,36 +102,55 @@ public class TokimiJeiPlugin implements IModPlugin {
     }
 
     private CraftingRecipe buildUpgradeRecipe(BoatTier tier, BoatWood wood, Item input, Item ingot, UpgradedBoatItem output) {
-        Identifier id = new Identifier(TokimiBoatyard.MOD_ID,
+//? if <1.21.1 {
+        ResourceLocation id = ModIds.of(TokimiBoatyard.MOD_ID,
             "jei_up_" + tier.id() + "_" + wood.tokimiPath());
-        DefaultedList<Ingredient> ingredients = DefaultedList.ofSize(9, Ingredient.EMPTY);
-        Ingredient ingotIng = Ingredient.ofItems(ingot);
-        Ingredient inputIng = Ingredient.ofItems(input);
+//? }
+        NonNullList<Ingredient> ingredients = NonNullList.withSize(9, Ingredient.EMPTY);
+        Ingredient ingotIng = Ingredient.of(ingot);
+        Ingredient inputIng = Ingredient.of(input);
         for (int i = 0; i < 9; i++) {
             ingredients.set(i, i == 4 ? inputIng : ingotIng);
         }
-        return new ShapedRecipe(id, "", CraftingRecipeCategory.MISC, 3, 3, ingredients, new ItemStack(output));
+//? if >=1.21.1 {
+        /*return new ShapedRecipe("", CraftingBookCategory.MISC,
+            new ShapedRecipePattern(3, 3, ingredients, Optional.empty()), new ItemStack(output));
+*///? } else {
+        return new ShapedRecipe(id, "", CraftingBookCategory.MISC, 3, 3, ingredients, new ItemStack(output));
+//? }
     }
 
     private CraftingRecipe buildExpansionRecipe(BoatTier tier, BoatWood wood, UpgradedBoatItem item) {
-        Identifier id = new Identifier(TokimiBoatyard.MOD_ID,
+//? if <1.21.1 {
+        ResourceLocation id = ModIds.of(TokimiBoatyard.MOD_ID,
             "jei_seat_" + tier.id() + "_" + wood.tokimiPath());
-        DefaultedList<Ingredient> ingredients = DefaultedList.ofSize(2, Ingredient.EMPTY);
-        ingredients.set(0, Ingredient.ofItems(item));
-        ingredients.set(1, Ingredient.ofItems(Items.SADDLE));
+//? }
+        NonNullList<Ingredient> ingredients = NonNullList.withSize(2, Ingredient.EMPTY);
+        ingredients.set(0, Ingredient.of(item));
+        ingredients.set(1, Ingredient.of(Items.SADDLE));
         ItemStack result = new ItemStack(item);
-        result.getOrCreateNbt().putInt("ExtraSeats", 1);
-        return new ShapelessRecipe(id, "", CraftingRecipeCategory.MISC, result, ingredients);
+        UpgradedBoatItem.writeExtraSeats(result, 1);
+//? if >=1.21.1 {
+        /*return new ShapelessRecipe("", CraftingBookCategory.MISC, result, ingredients);
+*///? } else {
+        return new ShapelessRecipe(id, "", CraftingBookCategory.MISC, result, ingredients);
+//? }
     }
 
     private CraftingRecipe buildDowngradeRecipe(BoatTier tier, BoatWood wood, UpgradedBoatItem item) {
-        Identifier id = new Identifier(TokimiBoatyard.MOD_ID,
+//? if <1.21.1 {
+        ResourceLocation id = ModIds.of(TokimiBoatyard.MOD_ID,
             "jei_down_" + tier.id() + "_" + wood.tokimiPath());
-        DefaultedList<Ingredient> ingredients = DefaultedList.ofSize(1, Ingredient.EMPTY);
+//? }
+        NonNullList<Ingredient> ingredients = NonNullList.withSize(1, Ingredient.EMPTY);
         ItemStack boatWithSeat = new ItemStack(item);
-        boatWithSeat.getOrCreateNbt().putInt("ExtraSeats", 1);
-        ingredients.set(0, Ingredient.ofStacks(boatWithSeat));
-        return new ShapelessRecipe(id, "", CraftingRecipeCategory.MISC, new ItemStack(Items.SADDLE), ingredients);
+        UpgradedBoatItem.writeExtraSeats(boatWithSeat, 1);
+        ingredients.set(0, Ingredient.of(boatWithSeat));
+//? if >=1.21.1 {
+        /*return new ShapelessRecipe("", CraftingBookCategory.MISC, new ItemStack(Items.SADDLE), ingredients);
+*///? } else {
+        return new ShapelessRecipe(id, "", CraftingBookCategory.MISC, new ItemStack(Items.SADDLE), ingredients);
+//? }
     }
 
     private Item ingotFor(BoatTier tier) {

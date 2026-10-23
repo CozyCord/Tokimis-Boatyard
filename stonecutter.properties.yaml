@@ -1,0 +1,33 @@
+mod:
+  id: tokimiboatyard
+  name: Tokimi's Boatyard
+  authors: [Toekimi]
+  license: ARR
+  group: net.cozystudios.tokimiboatyard
+  version: 1.1
+  description: >-
+    Upgradable chest boats — copper, iron, gold, emerald, diamond, netherite. Each tier adds a passenger seat, a row of storage, and extra speed. Netherite boats float on lava.
+loomx.loom_version: "1.17.21"
+
+targets:
+  - minecraft: 1.20.1
+    loaders: [fabric]
+  - minecraft: 1.21.1
+    loaders: [fabric, neoforge]
+
+"1.20.1":
+  java:
+    version: 17
+  loader_version: 0.17.2
+  fabric_version: 0.92.6+1.20.1
+  jei_version: 15.21.0.148
+
+"1.21.1":
+  java:
+    version: 21
+  loader_version: 0.19.2
+  fabric_version: 0.116.12+1.21.1
+  jei_version: 19.21.0.247
+  neoforge:
+    deps:
+      neoforge: 21.1.209

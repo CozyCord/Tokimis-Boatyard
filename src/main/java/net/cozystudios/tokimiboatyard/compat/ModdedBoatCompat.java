@@ -1,18 +1,22 @@
 package net.cozystudios.tokimiboatyard.compat;
 
+import net.cozystudios.tokimiboatyard.util.ModIds;
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
 import net.cozystudios.tokimiboatyard.TokimiBoatyard;
 import net.cozystudios.tokimiboatyard.data.BoatWood;
 import net.cozystudios.tokimiboatyard.data.BoatWoodRegistry;
+//? if fabric {
 import net.fabricmc.loader.api.FabricLoader;
 import net.fabricmc.loader.api.ModContainer;
-import net.minecraft.entity.vehicle.BoatEntity;
-import net.minecraft.item.Item;
-import net.minecraft.item.Items;
-import net.minecraft.registry.Registries;
-import net.minecraft.util.Identifier;
-
+//?} else if neoforge {
+/*import net.neoforged.fml.ModList;
+*///?}
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Items;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.nio.file.Files;
@@ -42,15 +46,22 @@ public final class ModdedBoatCompat {
         for (BoatWood w : BoatWoodRegistry.all()) {
             TokimiBoatyard.LOGGER.info("  wood={} iconLayer={} entity={} baseItem={}",
                 w.id(), w.itemIconLayer(), w.entityTexture(),
-                w.baseChestBoatItem() == null ? "null" : Registries.ITEM.getId(w.baseChestBoatItem()));
+                w.baseChestBoatItem() == null ? "null" : BuiltInRegistries.ITEM.getKey(w.baseChestBoatItem()));
         }
     }
 
-    private static Identifier resolveLayer0(String modid, String wood, Identifier fallback) {
+    private static ResourceLocation resolveLayer0(String modid, String wood, ResourceLocation fallback) {
+        //? if fabric {
         Optional<ModContainer> modOpt = FabricLoader.getInstance().getModContainer(modid);
         if (modOpt.isEmpty()) return fallback;
         Optional<Path> pathOpt = modOpt.get().findPath("assets/" + modid + "/models/item/" + wood + "_chest_boat.json");
         if (pathOpt.isEmpty()) return fallback;
+        //?} else if neoforge {
+        /*Optional<Path> pathOpt = ModList.get().getModContainerById(modid)
+            .map(container -> container.getModInfo().getOwningFile().getFile()
+                .findResource("assets/" + modid + "/models/item/" + wood + "_chest_boat.json"));
+        if (pathOpt.isEmpty()) return fallback;
+        *///?}
         try {
             String content = Files.readString(pathOpt.get());
             JsonObject json = JsonParser.parseString(content).getAsJsonObject();
@@ -58,7 +69,7 @@ public final class ModdedBoatCompat {
                 JsonObject textures = json.getAsJsonObject("textures");
                 if (textures.has("layer0")) {
                     String layer0 = textures.get("layer0").getAsString();
-                    Identifier parsed = Identifier.tryParse(layer0);
+                    ResourceLocation parsed = ResourceLocation.tryParse(layer0);
                     if (parsed != null) return parsed;
                 }
             }
@@ -67,25 +78,25 @@ public final class ModdedBoatCompat {
     }
 
     private static void registerVanillaWoods() {
-        registerVanilla(BoatEntity.Type.OAK,       Items.OAK_CHEST_BOAT,       "Oak");
-        registerVanilla(BoatEntity.Type.SPRUCE,    Items.SPRUCE_CHEST_BOAT,    "Spruce");
-        registerVanilla(BoatEntity.Type.BIRCH,     Items.BIRCH_CHEST_BOAT,     "Birch");
-        registerVanilla(BoatEntity.Type.JUNGLE,    Items.JUNGLE_CHEST_BOAT,    "Jungle");
-        registerVanilla(BoatEntity.Type.ACACIA,    Items.ACACIA_CHEST_BOAT,    "Acacia");
-        registerVanilla(BoatEntity.Type.DARK_OAK,  Items.DARK_OAK_CHEST_BOAT,  "Dark Oak");
-        registerVanilla(BoatEntity.Type.MANGROVE,  Items.MANGROVE_CHEST_BOAT,  "Mangrove");
-        registerVanilla(BoatEntity.Type.CHERRY,    Items.CHERRY_CHEST_BOAT,    "Cherry");
-        registerVanilla(BoatEntity.Type.BAMBOO,    Items.BAMBOO_CHEST_RAFT,    "Bamboo");
+        registerVanilla(Boat.Type.OAK,       Items.OAK_CHEST_BOAT,       "Oak");
+        registerVanilla(Boat.Type.SPRUCE,    Items.SPRUCE_CHEST_BOAT,    "Spruce");
+        registerVanilla(Boat.Type.BIRCH,     Items.BIRCH_CHEST_BOAT,     "Birch");
+        registerVanilla(Boat.Type.JUNGLE,    Items.JUNGLE_CHEST_BOAT,    "Jungle");
+        registerVanilla(Boat.Type.ACACIA,    Items.ACACIA_CHEST_BOAT,    "Acacia");
+        registerVanilla(Boat.Type.DARK_OAK,  Items.DARK_OAK_CHEST_BOAT,  "Dark Oak");
+        registerVanilla(Boat.Type.MANGROVE,  Items.MANGROVE_CHEST_BOAT,  "Mangrove");
+        registerVanilla(Boat.Type.CHERRY,    Items.CHERRY_CHEST_BOAT,    "Cherry");
+        registerVanilla(Boat.Type.BAMBOO,    Items.BAMBOO_CHEST_RAFT,    "Bamboo");
     }
 
-    private static void registerVanilla(BoatEntity.Type type, Item baseItem, String displayName) {
+    private static void registerVanilla(Boat.Type type, Item baseItem, String displayName) {
         String name = type.getName();
-        boolean isRaft = type == BoatEntity.Type.BAMBOO;
+        boolean isRaft = type == Boat.Type.BAMBOO;
         String iconSuffix = isRaft ? "_chest_raft" : "_chest_boat";
         BoatWoodRegistry.register(new BoatWood(
-            new Identifier("minecraft", name),
-            new Identifier("minecraft", "textures/entity/chest_boat/" + name + ".png"),
-            new Identifier("minecraft", "item/" + name + iconSuffix),
+            ModIds.of("minecraft", name),
+            ModIds.of("minecraft", "textures/entity/chest_boat/" + name + ".png"),
+            ModIds.of("minecraft", "item/" + name + iconSuffix),
             type,
             displayName,
             isRaft,
@@ -94,7 +105,7 @@ public final class ModdedBoatCompat {
     }
 
     private static void scanEnumExtensions() {
-        for (BoatEntity.Type type : BoatEntity.Type.values()) {
+        for (Boat.Type type : Boat.Type.values()) {
             if (BoatWoodRegistry.getByVanillaType(type) != null) continue;
 
             String rawName = type.getName();
@@ -106,20 +117,20 @@ public final class ModdedBoatCompat {
                 path = rawName.substring(nsCandidate.length() + 1);
             }
 
-            Identifier id = new Identifier(namespace, path);
-            Item baseItem = Registries.ITEM.get(new Identifier(namespace, path + "_chest_boat"));
+            ResourceLocation id = ModIds.of(namespace, path);
+            Item baseItem = BuiltInRegistries.ITEM.get(ModIds.of(namespace, path + "_chest_boat"));
             if (baseItem == Items.AIR) baseItem = null;
 
-            Identifier fallbackIcon = baseItem != null
-                ? new Identifier(namespace, "item/" + path + "_chest_boat")
-                : new Identifier("minecraft", "item/oak_chest_boat");
-            Identifier itemIcon = baseItem != null
+            ResourceLocation fallbackIcon = baseItem != null
+                ? ModIds.of(namespace, "item/" + path + "_chest_boat")
+                : ModIds.of("minecraft", "item/oak_chest_boat");
+            ResourceLocation itemIcon = baseItem != null
                 ? resolveLayer0(namespace, path, fallbackIcon)
                 : fallbackIcon;
 
             BoatWoodRegistry.register(new BoatWood(
                 id,
-                new Identifier("minecraft", "textures/entity/chest_boat/" + rawName + ".png"),
+                ModIds.of("minecraft", "textures/entity/chest_boat/" + rawName + ".png"),
                 itemIcon,
                 type,
                 prettify(path),
@@ -140,26 +151,26 @@ public final class ModdedBoatCompat {
     }
 
     private static void scanModdedItems() {
-        for (Identifier itemId : Registries.ITEM.getIds()) {
+        for (ResourceLocation itemId : BuiltInRegistries.ITEM.keySet()) {
             if (!ALLOWED_NAMESPACES.contains(itemId.getNamespace())) continue;
             String path = itemId.getPath();
             if (!path.endsWith("_chest_boat")) continue;
 
             String wood = path.substring(0, path.length() - "_chest_boat".length());
-            Identifier woodId = new Identifier(itemId.getNamespace(), wood);
+            ResourceLocation woodId = ModIds.of(itemId.getNamespace(), wood);
             if (BoatWoodRegistry.has(woodId)) continue;
 
-            Item baseItem = Registries.ITEM.get(itemId);
+            Item baseItem = BuiltInRegistries.ITEM.get(itemId);
             if (baseItem == Items.AIR) continue;
 
-            BoatEntity.Type matchedType = findEnumTypeByName(itemId.getNamespace() + "_" + wood);
+            Boat.Type matchedType = findEnumTypeByName(itemId.getNamespace() + "_" + wood);
 
-            Identifier fallbackIcon = new Identifier(itemId.getNamespace(), "item/" + wood + "_chest_boat");
-            Identifier itemIcon = resolveLayer0(itemId.getNamespace(), wood, fallbackIcon);
+            ResourceLocation fallbackIcon = ModIds.of(itemId.getNamespace(), "item/" + wood + "_chest_boat");
+            ResourceLocation itemIcon = resolveLayer0(itemId.getNamespace(), wood, fallbackIcon);
 
             BoatWoodRegistry.register(new BoatWood(
                 woodId,
-                new Identifier(itemId.getNamespace(), "textures/entity/chest_boat/" + wood + ".png"),
+                ModIds.of(itemId.getNamespace(), "textures/entity/chest_boat/" + wood + ".png"),
                 itemIcon,
                 matchedType,
                 prettify(wood),
@@ -169,8 +180,8 @@ public final class ModdedBoatCompat {
         }
     }
 
-    private static BoatEntity.Type findEnumTypeByName(String name) {
-        for (BoatEntity.Type t : BoatEntity.Type.values()) {
+    private static Boat.Type findEnumTypeByName(String name) {
+        for (Boat.Type t : Boat.Type.values()) {
             if (t.getName().equals(name)) return t;
         }
         return null;

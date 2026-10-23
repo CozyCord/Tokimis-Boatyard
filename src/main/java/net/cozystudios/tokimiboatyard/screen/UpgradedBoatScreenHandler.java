@@ -1,33 +1,35 @@
 package net.cozystudios.tokimiboatyard.screen;
 
 import net.cozystudios.tokimiboatyard.registry.ModScreens;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.entity.player.PlayerInventory;
-import net.minecraft.inventory.Inventory;
-import net.minecraft.inventory.SimpleInventory;
-import net.minecraft.item.ItemStack;
-import net.minecraft.network.PacketByteBuf;
-import net.minecraft.screen.ScreenHandler;
-import net.minecraft.screen.slot.Slot;
+import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.Container;
+import net.minecraft.world.SimpleContainer;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.inventory.Slot;
+import net.minecraft.world.item.ItemStack;
 
-public class UpgradedBoatScreenHandler extends ScreenHandler {
-    private final Inventory inventory;
+public class UpgradedBoatScreenHandler extends AbstractContainerMenu {
+    private final Container inventory;
     private final int rows;
 
-    public UpgradedBoatScreenHandler(int syncId, PlayerInventory playerInv, PacketByteBuf buf) {
+    //? if <1.21.1 {
+    public UpgradedBoatScreenHandler(int syncId, Inventory playerInv, FriendlyByteBuf buf) {
         this(syncId, playerInv, buf.readByte() & 0xFF);
     }
+    //? }
 
-    public UpgradedBoatScreenHandler(int syncId, PlayerInventory playerInv, int rows) {
-        this(syncId, playerInv, new SimpleInventory(rows * 9), rows);
+    public UpgradedBoatScreenHandler(int syncId, Inventory playerInv, int rows) {
+        this(syncId, playerInv, new SimpleContainer(rows * 9), rows);
     }
 
-    public UpgradedBoatScreenHandler(int syncId, PlayerInventory playerInv, Inventory inventory, int rows) {
+    public UpgradedBoatScreenHandler(int syncId, Inventory playerInv, Container inventory, int rows) {
         super(ModScreens.UPGRADED_BOAT, syncId);
-        checkSize(inventory, rows * 9);
+        checkContainerSize(inventory, rows * 9);
         this.inventory = inventory;
         this.rows = rows;
-        inventory.onOpen(playerInv.player);
+        inventory.startOpen(playerInv.player);
 
         int extraOffset = (rows - 4) * 18;
 
@@ -47,35 +49,35 @@ public class UpgradedBoatScreenHandler extends ScreenHandler {
     }
 
     @Override
-    public ItemStack quickMove(PlayerEntity player, int slotIndex) {
+    public ItemStack quickMoveStack(Player player, int slotIndex) {
         ItemStack result = ItemStack.EMPTY;
         Slot slot = this.slots.get(slotIndex);
-        if (slot != null && slot.hasStack()) {
-            ItemStack src = slot.getStack();
+        if (slot != null && slot.hasItem()) {
+            ItemStack src = slot.getItem();
             result = src.copy();
             int boatEnd = rows * 9;
             if (slotIndex < boatEnd) {
-                if (!this.insertItem(src, boatEnd, this.slots.size(), true)) return ItemStack.EMPTY;
-            } else if (!this.insertItem(src, 0, boatEnd, false)) {
+                if (!this.moveItemStackTo(src, boatEnd, this.slots.size(), true)) return ItemStack.EMPTY;
+            } else if (!this.moveItemStackTo(src, 0, boatEnd, false)) {
                 return ItemStack.EMPTY;
             }
-            if (src.isEmpty()) slot.setStack(ItemStack.EMPTY);
-            else slot.markDirty();
+            if (src.isEmpty()) slot.setByPlayer(ItemStack.EMPTY);
+            else slot.setChanged();
         }
         return result;
     }
 
     @Override
-    public boolean canUse(PlayerEntity player) {
-        return this.inventory.canPlayerUse(player);
+    public boolean stillValid(Player player) {
+        return this.inventory.stillValid(player);
     }
 
     @Override
-    public void onClosed(PlayerEntity player) {
-        super.onClosed(player);
-        this.inventory.onClose(player);
+    public void removed(Player player) {
+        super.removed(player);
+        this.inventory.stopOpen(player);
     }
 
     public int getRows() { return rows; }
-    public Inventory getInventory() { return inventory; }
+    public Container getInventory() { return inventory; }
 }

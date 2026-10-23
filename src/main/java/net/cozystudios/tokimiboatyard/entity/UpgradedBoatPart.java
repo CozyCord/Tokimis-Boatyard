@@ -1,50 +1,58 @@
 package net.cozystudios.tokimiboatyard.entity;
 
-import net.minecraft.entity.Entity;
-import net.minecraft.entity.EntityType;
-import net.minecraft.entity.LivingEntity;
-import net.minecraft.entity.damage.DamageSource;
-import net.minecraft.entity.data.DataTracker;
-import net.minecraft.entity.data.TrackedData;
-import net.minecraft.entity.data.TrackedDataHandlerRegistry;
-import net.minecraft.entity.mob.WaterCreatureEntity;
-import net.minecraft.entity.passive.PassiveEntity;
-import net.minecraft.entity.MovementType;
-import net.minecraft.entity.player.PlayerEntity;
-import net.minecraft.nbt.NbtCompound;
-import net.minecraft.network.listener.ClientPlayPacketListener;
-import net.minecraft.network.packet.Packet;
-import net.minecraft.network.packet.s2c.play.EntitySpawnS2CPacket;
-import net.minecraft.util.ActionResult;
-import net.minecraft.util.Hand;
-import net.minecraft.util.math.Vec3d;
-import net.minecraft.world.World;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundAddEntityPacket;
+//? if >=1.21.1 {
+/*import net.minecraft.server.level.ServerEntity;
+*///? }
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.InteractionResult;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MoverType;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 public class UpgradedBoatPart extends Entity {
-    private static final TrackedData<Integer> INDEX =
-        DataTracker.registerData(UpgradedBoatPart.class, TrackedDataHandlerRegistry.INTEGER);
-    private static final TrackedData<Float> OFFSET_Z =
-        DataTracker.registerData(UpgradedBoatPart.class, TrackedDataHandlerRegistry.FLOAT);
+    private static final EntityDataAccessor<Integer> INDEX =
+        SynchedEntityData.defineId(UpgradedBoatPart.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Float> OFFSET_Z =
+        SynchedEntityData.defineId(UpgradedBoatPart.class, EntityDataSerializers.FLOAT);
 
     private int lifelessCountdown = 20;
 
-    public UpgradedBoatPart(EntityType<? extends UpgradedBoatPart> type, World world) {
+    public UpgradedBoatPart(EntityType<? extends UpgradedBoatPart> type, Level world) {
         super(type, world);
-        this.intersectionChecked = true;
+        this.blocksBuilding = true;
     }
 
+    //? if >=1.21.1 {
+    /*@Override
+    protected void defineSynchedData(SynchedEntityData.Builder builder) {
+        builder.define(INDEX, 0);
+        builder.define(OFFSET_Z, 0f);
+    }
+    *///? } else {
     @Override
-    protected void initDataTracker() {
-        this.dataTracker.startTracking(INDEX, 0);
-        this.dataTracker.startTracking(OFFSET_Z, 0f);
+    protected void defineSynchedData() {
+        this.entityData.define(INDEX, 0);
+        this.entityData.define(OFFSET_Z, 0f);
     }
+    //? }
 
-    public int getIndex() { return dataTracker.get(INDEX); }
-    public void setIndex(int i) { dataTracker.set(INDEX, i); }
+    public int getIndex() { return entityData.get(INDEX); }
+    public void setIndex(int i) { entityData.set(INDEX, i); }
 
-    public float getOffsetZ() { return dataTracker.get(OFFSET_Z); }
-    public void setOffsetZ(float z) { dataTracker.set(OFFSET_Z, z); }
+    public float getOffsetZ() { return entityData.get(OFFSET_Z); }
+    public void setOffsetZ(float z) { entityData.set(OFFSET_Z, z); }
 
     public @Nullable UpgradedBoatEntity getParentBoat() {
         return getVehicle() instanceof UpgradedBoatEntity boat ? boat : null;
@@ -60,20 +68,20 @@ public class UpgradedBoatPart extends Entity {
     }
 
     @Override
-    public void move(MovementType type, Vec3d movement) {
-        if (this.hasVehicle()) return;
+    public void move(MoverType type, Vec3 movement) {
+        if (this.isPassenger()) return;
         super.move(type, movement);
     }
 
     @Override
-    public void onBubbleColumnCollision(boolean drag) {}
+    public void onInsideBubbleColumn(boolean drag) {}
 
     @Override
-    public void onBubbleColumnSurfaceCollision(boolean drag) {}
+    public void onAboveBubbleCol(boolean drag) {}
 
     @Override
     public void stopRiding() {
-        if (this.getWorld() != null && this.getWorld().isClient) {
+        if (this.level() != null && this.level().isClientSide) {
             super.stopRiding();
             return;
         }
@@ -89,14 +97,14 @@ public class UpgradedBoatPart extends Entity {
 
 
     @Override
-    public boolean damage(DamageSource source, float amount) {
+    public boolean hurt(DamageSource source, float amount) {
         UpgradedBoatEntity parent = getParentBoat();
-        if (parent != null) parent.damage(source, amount);
+        if (parent != null) parent.hurt(source, amount);
         return false;
     }
 
     @Override
-    public ActionResult interact(PlayerEntity player, Hand hand) {
+    public InteractionResult interact(Player player, InteractionHand hand) {
         UpgradedBoatEntity parent = getParentBoat();
         return parent != null
             ? parent.interactSegment(player, hand, getIndex())
@@ -104,40 +112,47 @@ public class UpgradedBoatPart extends Entity {
     }
 
     @Override
-    public boolean collidesWith(Entity other) {
-        return (other.isCollidable() || other.isPushable()) && !this.isConnectedThroughVehicle(other);
+    public boolean canCollideWith(Entity other) {
+        return (other.canBeCollidedWith() || other.isPushable()) && !this.isPassengerOfSameVehicle(other);
     }
 
     @Override
-    public boolean isCollidable() { return true; }
+    public boolean canBeCollidedWith() { return true; }
 
     @Override
     public boolean isPushable() { return true; }
 
     @Override
-    public boolean canHit() { return true; }
+    public boolean isPickable() { return true; }
 
     @Override
-    public Vec3d getVelocity() {
+    public Vec3 getDeltaMovement() {
         UpgradedBoatEntity parent = getParentBoat();
-        return parent != null ? parent.getVelocity() : super.getVelocity();
+        return parent != null ? parent.getDeltaMovement() : super.getDeltaMovement();
     }
 
 
     @Override
-    protected void readCustomDataFromNbt(NbtCompound nbt) {
+    protected void readAdditionalSaveData(CompoundTag nbt) {
         if (nbt.contains("Index")) setIndex(nbt.getInt("Index"));
         if (nbt.contains("OffsetZ")) setOffsetZ(nbt.getFloat("OffsetZ"));
     }
 
     @Override
-    protected void writeCustomDataToNbt(NbtCompound nbt) {
+    protected void addAdditionalSaveData(CompoundTag nbt) {
         nbt.putInt("Index", getIndex());
         nbt.putFloat("OffsetZ", getOffsetZ());
     }
 
-    @Override
-    public Packet<ClientPlayPacketListener> createSpawnPacket() {
-        return new EntitySpawnS2CPacket(this);
+    //? if >=1.21.1 {
+    /*@Override
+    public Packet<ClientGamePacketListener> getAddEntityPacket(ServerEntity serverEntity) {
+        return new ClientboundAddEntityPacket(this, serverEntity);
     }
+    *///? } else {
+    @Override
+    public Packet<ClientGamePacketListener> getAddEntityPacket() {
+        return new ClientboundAddEntityPacket(this);
+    }
+        //? }
 }

@@ -1,51 +1,52 @@
 package net.cozystudios.tokimiboatyard.entity.client;
 
 import com.google.common.collect.ImmutableMap;
+import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.math.Axis;
 import net.cozystudios.tokimiboatyard.data.BoatWood;
 import net.cozystudios.tokimiboatyard.data.BoatWoodRegistry;
 import net.cozystudios.tokimiboatyard.entity.BoatTier;
 import net.cozystudios.tokimiboatyard.entity.UpgradedBoatEntity;
 import net.cozystudios.tokimiboatyard.entity.UpgradedBoatPart;
-import net.minecraft.client.render.OverlayTexture;
-import net.minecraft.client.render.RenderLayer;
-import net.minecraft.client.render.VertexConsumer;
-import net.minecraft.client.render.VertexConsumerProvider;
-import net.minecraft.client.render.entity.EntityRenderer;
-import net.minecraft.client.render.entity.EntityRendererFactory;
-import net.minecraft.client.util.math.MatrixStack;
-import net.minecraft.util.Identifier;
-import net.minecraft.util.math.MathHelper;
-import net.minecraft.util.math.RotationAxis;
+import net.cozystudios.tokimiboatyard.util.ModIds;
+import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.entity.EntityRenderer;
+import net.minecraft.client.renderer.entity.EntityRendererProvider;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.util.Mth;
 import org.joml.Quaternionf;
 
 import java.util.Map;
 
 public class UpgradedBoatRenderer extends EntityRenderer<UpgradedBoatEntity> {
-    private static final Identifier FALLBACK_TEXTURE =
-        new Identifier("minecraft", "textures/entity/chest_boat/oak.png");
+    private static final ResourceLocation FALLBACK_TEXTURE =
+        ModIds.of("minecraft", "textures/entity/chest_boat/oak.png");
 
-    private final Map<BoatTier, Identifier> tierBlockTextures;
+    private final Map<BoatTier, ResourceLocation> tierBlockTextures;
     private final UpgradedBoatModel boatModel;
     private final UpgradedBoatBandModel boatBandModel;
     private final UpgradedRaftModel raftModel;
     private final UpgradedRaftBandModel raftBandModel;
 
-    public UpgradedBoatRenderer(EntityRendererFactory.Context ctx) {
+    public UpgradedBoatRenderer(EntityRendererProvider.Context ctx) {
         super(ctx);
         this.shadowRadius = 0.8F;
-        this.boatModel = new UpgradedBoatModel(ctx.getPart(ModModelLayers.UPGRADED_BOAT_CHUNK));
-        this.boatBandModel = new UpgradedBoatBandModel(ctx.getPart(ModModelLayers.UPGRADED_BOAT_BAND));
-        this.raftModel = new UpgradedRaftModel(ctx.getPart(ModModelLayers.UPGRADED_RAFT_CHUNK));
-        this.raftBandModel = new UpgradedRaftBandModel(ctx.getPart(ModModelLayers.UPGRADED_RAFT_BAND));
-        ImmutableMap.Builder<BoatTier, Identifier> tierBuilder = ImmutableMap.builder();
+        this.boatModel = new UpgradedBoatModel(ctx.bakeLayer(ModModelLayers.UPGRADED_BOAT_CHUNK));
+        this.boatBandModel = new UpgradedBoatBandModel(ctx.bakeLayer(ModModelLayers.UPGRADED_BOAT_BAND));
+        this.raftModel = new UpgradedRaftModel(ctx.bakeLayer(ModModelLayers.UPGRADED_RAFT_CHUNK));
+        this.raftBandModel = new UpgradedRaftBandModel(ctx.bakeLayer(ModModelLayers.UPGRADED_RAFT_BAND));
+        ImmutableMap.Builder<BoatTier, ResourceLocation> tierBuilder = ImmutableMap.builder();
         for (BoatTier tier : BoatTier.values()) {
-            tierBuilder.put(tier, new Identifier(tier.blockTexturePath()));
+            tierBuilder.put(tier, ModIds.parse(tier.blockTexturePath()));
         }
         this.tierBlockTextures = tierBuilder.build();
     }
 
     @Override
-    public Identifier getTexture(UpgradedBoatEntity entity) {
+    public ResourceLocation getTextureLocation(UpgradedBoatEntity entity) {
         BoatWood wood = BoatWoodRegistry.get(entity.getWoodId());
         return wood != null ? wood.entityTexture() : FALLBACK_TEXTURE;
     }
@@ -57,34 +58,34 @@ public class UpgradedBoatRenderer extends EntityRenderer<UpgradedBoatEntity> {
 
     @Override
     public void render(UpgradedBoatEntity entity, float yaw, float tickDelta,
-                       MatrixStack matrices, VertexConsumerProvider vertexConsumers, int light) {
+                       PoseStack matrices, MultiBufferSource vertexConsumers, int light) {
         int expectedParts = entity.getExtraParts();
-        if (expectedParts > 0 && entity.age < 20) {
-            long partCount = entity.getPassengerList().stream()
+        if (expectedParts > 0 && entity.tickCount < 20) {
+            long partCount = entity.getPassengers().stream()
                 .filter(e -> e instanceof UpgradedBoatPart).count();
             if (partCount < expectedParts) return;
         }
-        matrices.push();
+        matrices.pushPose();
         matrices.translate(0.0, 0.375, 0.0);
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(180.0F - yaw));
+        matrices.mulPose(Axis.YP.rotationDegrees(180.0F - yaw));
 
-        float damageWobble = entity.getDamageWobbleTicks() - tickDelta;
-        float damageWobbleStrength = entity.getDamageWobbleStrength() - tickDelta;
+        float damageWobble = entity.getHurtTime() - tickDelta;
+        float damageWobbleStrength = entity.getDamage() - tickDelta;
         if (damageWobbleStrength < 0.0F) damageWobbleStrength = 0.0F;
         if (damageWobble > 0.0F) {
-            matrices.multiply(RotationAxis.POSITIVE_X.rotationDegrees(
-                MathHelper.sin(damageWobble) * damageWobble * damageWobbleStrength / 10.0F
-                    * (float) entity.getDamageWobbleSide()));
+            matrices.mulPose(Axis.XP.rotationDegrees(
+                Mth.sin(damageWobble) * damageWobble * damageWobbleStrength / 10.0F
+                    * (float) entity.getHurtDir()));
         }
 
-        float bubbleWobble = entity.interpolateBubbleWobble(tickDelta);
-        if (!MathHelper.approximatelyEquals(bubbleWobble, 0.0F)) {
-            matrices.multiply(new Quaternionf().setAngleAxis(
+        float bubbleWobble = entity.getBubbleAngle(tickDelta);
+        if (!Mth.equal(bubbleWobble, 0.0F)) {
+            matrices.mulPose(new Quaternionf().setAngleAxis(
                 bubbleWobble * ((float) Math.PI / 180F), 1.0F, 0.0F, 1.0F));
         }
 
         matrices.scale(-1.0F, -1.0F, 1.0F);
-        matrices.multiply(RotationAxis.POSITIVE_Y.rotationDegrees(90.0F));
+        matrices.mulPose(Axis.YP.rotationDegrees(90.0F));
 
         boolean singleSegment = entity.getExtraParts() == 0;
 
@@ -100,13 +101,21 @@ public class UpgradedBoatRenderer extends EntityRenderer<UpgradedBoatEntity> {
             }
 
             VertexConsumer buffer = vertexConsumers.getBuffer(
-                RenderLayer.getEntityCutoutNoCull(getTexture(entity)));
-            this.raftModel.render(matrices, buffer, light, OverlayTexture.DEFAULT_UV, 1.0F, 1.0F, 1.0F, 1.0F);
+                RenderType.entityCutoutNoCull(getTextureLocation(entity)));
+            //? if >=1.21 {
+            /*this.raftModel.renderToBuffer(matrices, buffer, light, OverlayTexture.NO_OVERLAY, -1);
+            *///?} else {
+            this.raftModel.renderToBuffer(matrices, buffer, light, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
+            //?}
 
-            Identifier bandTex = this.tierBlockTextures.get(entity.getTier());
+            ResourceLocation bandTex = this.tierBlockTextures.get(entity.getTier());
             VertexConsumer bandBuffer = vertexConsumers.getBuffer(
-                RenderLayer.getEntityCutoutNoCull(bandTex));
-            this.raftBandModel.render(matrices, bandBuffer, light, OverlayTexture.DEFAULT_UV, 1.0F, 1.0F, 1.0F, 1.0F);
+                RenderType.entityCutoutNoCull(bandTex));
+            //? if >=1.21 {
+            /*this.raftBandModel.render(matrices, bandBuffer, light, OverlayTexture.NO_OVERLAY, -1);
+            *///?} else {
+            this.raftBandModel.render(matrices, bandBuffer, light, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
+            //?}
         } else {
             this.boatModel.setVisible(true, singleSegment, true, true);
             this.boatModel.setPaddlesVisible(true, true);
@@ -118,21 +127,29 @@ public class UpgradedBoatRenderer extends EntityRenderer<UpgradedBoatEntity> {
             }
 
             VertexConsumer buffer = vertexConsumers.getBuffer(
-                RenderLayer.getEntityCutoutNoCull(getTexture(entity)));
-            this.boatModel.render(matrices, buffer, light, OverlayTexture.DEFAULT_UV, 1.0F, 1.0F, 1.0F, 1.0F);
+                RenderType.entityCutoutNoCull(getTextureLocation(entity)));
+            //? if >=1.21 {
+            /*this.boatModel.renderToBuffer(matrices, buffer, light, OverlayTexture.NO_OVERLAY, -1);
+            *///?} else {
+            this.boatModel.renderToBuffer(matrices, buffer, light, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
+            //?}
 
-            Identifier bandTex = this.tierBlockTextures.get(entity.getTier());
+            ResourceLocation bandTex = this.tierBlockTextures.get(entity.getTier());
             VertexConsumer bandBuffer = vertexConsumers.getBuffer(
-                RenderLayer.getEntityCutoutNoCull(bandTex));
-            this.boatBandModel.render(matrices, bandBuffer, light, OverlayTexture.DEFAULT_UV, 1.0F, 1.0F, 1.0F, 1.0F);
+                RenderType.entityCutoutNoCull(bandTex));
+            //? if >=1.21 {
+            /*this.boatBandModel.render(matrices, bandBuffer, light, OverlayTexture.NO_OVERLAY, -1);
+            *///?} else {
+            this.boatBandModel.render(matrices, bandBuffer, light, OverlayTexture.NO_OVERLAY, 1.0F, 1.0F, 1.0F, 1.0F);
+            //?}
 
-            if (!entity.isSubmergedInWater()) {
-                VertexConsumer waterBuffer = vertexConsumers.getBuffer(RenderLayer.getWaterMask());
-                this.boatModel.getWaterPatch().render(matrices, waterBuffer, light, OverlayTexture.DEFAULT_UV);
+            if (!entity.isUnderWater()) {
+                VertexConsumer waterBuffer = vertexConsumers.getBuffer(RenderType.waterMask());
+                this.boatModel.waterPatch().render(matrices, waterBuffer, light, OverlayTexture.NO_OVERLAY);
             }
         }
 
-        matrices.pop();
+        matrices.popPose();
         super.render(entity, yaw, tickDelta, matrices, vertexConsumers, light);
     }
 }

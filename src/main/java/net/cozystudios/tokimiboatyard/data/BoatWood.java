@@ -1,15 +1,15 @@
 package net.cozystudios.tokimiboatyard.data;
 
-import net.minecraft.entity.vehicle.BoatEntity;
-import net.minecraft.item.Item;
-import net.minecraft.util.Identifier;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.entity.vehicle.Boat;
+import net.minecraft.world.item.Item;
 import org.jetbrains.annotations.Nullable;
 
 public record BoatWood(
-    Identifier id,
-    Identifier entityTexture,
-    Identifier itemIconLayer,
-    @Nullable BoatEntity.Type vanillaType,
+    ResourceLocation id,
+    ResourceLocation entityTexture,
+    ResourceLocation itemIconLayer,
+    @Nullable Boat.Type vanillaType,
     String displayName,
     boolean isRaft,
     @Nullable Item baseChestBoatItem
